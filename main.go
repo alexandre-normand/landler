@@ -89,7 +89,7 @@ func findFunctions(path string) (handlerNames []string, err error) {
 	handlerNames = make([]string, 0)
 	for _, decl := range f.Decls {
 		if fun, ok := decl.(*ast.FuncDecl); ok {
-			if isHttpHandler(fun) {
+			if isHttpHandler(fun) && ast.IsExported(fun.Name.Name) {
 				handlerNames = append(handlerNames, fun.Name.Name)
 			}
 		}
@@ -99,14 +99,18 @@ func findFunctions(path string) (handlerNames []string, err error) {
 }
 
 func isHttpHandler(funcDeclaration *ast.FuncDecl) bool {
-	if funcDeclaration.Recv != nil {
-		return false
-	} else if funcDeclaration.Type.Results != nil {
-		return false
-	} else if funcDeclaration.Type.Params == nil {
-		return false
-	} else if len(funcDeclaration.Type.Params.List) == 2 {
-		return true
+	if funcDeclaration.Recv == nil && funcDeclaration.Type.Results == nil && funcDeclaration.Type.Params != nil && len(funcDeclaration.Type.Params.List) == 2 {
+		if sel, ok := funcDeclaration.Type.Params.List[0].Type.(*ast.SelectorExpr); ok {
+			if sel.Sel.Name == "ResponseWriter" {
+				if star, ok := funcDeclaration.Type.Params.List[1].Type.(*ast.StarExpr); ok {
+					if sel, ok := star.X.(*ast.SelectorExpr); ok {
+						if sel.Sel.Name == "Request" {
+							return true
+						}
+					}
+				}
+			}
+		}
 	}
 
 	return false
